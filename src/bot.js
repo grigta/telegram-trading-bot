@@ -305,6 +305,7 @@ class TradingBot {
 
       // Ensure user exists before setting language
       let user = await this.db.getUserByTelegramId(userId);
+      const isNewUser = !user || !user.language_selected;
       if (!user) {
         const userData = {
           telegram_id: userId,
@@ -326,9 +327,15 @@ class TradingBot {
       });
 
       // Send welcome message
-      await this.bot.sendMessage(chatId, translator.get('welcome', selectedLang), {
+      const welcomeMessage = await this.bot.sendMessage(chatId, translator.get('welcome', selectedLang), {
         parse_mode: 'Markdown'
       });
+
+      if (isNewUser && welcomeMessage && welcomeMessage.message_id) {
+        setTimeout(() => {
+          this.bot.deleteMessage(chatId, welcomeMessage.message_id).catch(() => {});
+        }, 3000);
+      }
 
       // Continue with subscription check or phone request
       user = await this.db.getUserByTelegramId(userId);
