@@ -136,7 +136,7 @@ class TradingBot {
   }
 
   async requestPhoneNumber(chatId, lang) {
-    await this.bot.sendMessage(chatId, translator.get('sharePhone', lang), {
+    const sent = await this.bot.sendMessage(chatId, translator.get('sharePhone', lang), {
       reply_markup: {
         keyboard: [
           [{
@@ -148,6 +148,7 @@ class TradingBot {
         one_time_keyboard: true
       }
     });
+    messageManager.setLastMessage(chatId, sent.message_id);
   }
 
   async handleContact(msg) {

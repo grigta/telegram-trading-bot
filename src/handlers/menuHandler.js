@@ -82,14 +82,14 @@ _Выберите любой пункт меню для начала:_
             parse_mode: 'Markdown',
             reply_markup: keyboard
           });
-          // keep same lastId
         } catch (e) {
+          // If edit fails (message not found/too old), send new and delete previous
           const sent = await this.bot.sendMessage(chatId, message, {
             parse_mode: 'Markdown',
             reply_markup: keyboard
           });
+          await messageManager.deleteMessageById(this.bot, chatId, lastId);
           messageManager.setLastMessage(chatId, sent.message_id);
-          await messageManager.deleteLastMessage(this.bot, chatId);
         }
       } else {
         const sent = await this.bot.sendMessage(chatId, message, {

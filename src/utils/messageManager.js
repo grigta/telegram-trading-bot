@@ -20,10 +20,30 @@ async function deleteLastMessage(bot, chatId) {
   }
 }
 
+async function deleteMessageById(bot, chatId, messageId) {
+  if (!messageId) return false;
+  try {
+    await bot.deleteMessage(chatId, messageId);
+    const current = getLastMessage(chatId);
+    if (current === messageId) {
+      lastMessageByChat.delete(chatId);
+    }
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+function clearLastMessage(chatId) {
+  lastMessageByChat.delete(chatId);
+}
+
 module.exports = {
   setLastMessage,
   getLastMessage,
-  deleteLastMessage
+  deleteLastMessage,
+  deleteMessageById,
+  clearLastMessage
 };
 
 
