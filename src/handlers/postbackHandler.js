@@ -227,13 +227,37 @@ class PostbackHandler {
         registration_date: new Date().toISOString()
       });
 
-      // Отправляем уведомление пользователю
+      // Отправляем уведомление пользователю с предложением пополнить депозит
       const lang = await this.db.getUserLanguage(user.telegram_id);
-      const message = lang === 'en'
-        ? '🎉 Congratulations! Your registration has been confirmed. You can now start trading!'
-        : '🎉 Поздравляем! Ваша регистрация подтверждена. Теперь вы можете начать торговать!';
 
-      await this.bot.sendMessage(user.telegram_id, message);
+      let message, depositUrl;
+      if (lang === 'en') {
+        message = '🎉 *Congratulations! Registration completed successfully!*\n\n' +
+                 '💰 To start earning, make your first deposit of $50 or more.\n\n' +
+                 '🎁 *Special bonus:* Use promo code **50START** for extra bonus!\n\n' +
+                 '👇 Click the button below to make your deposit:';
+        depositUrl = 'https://u3.shortink.io/cabinet/demo-high-low/?try-demo=1&redirectUrl=cabinet/deposit-step-1&utm_campaign=764996&utm_source=affiliate&utm_medium=sr&a=qjU9XsMF2HJcK3&ac=bot&code=50START';
+      } else {
+        message = '🎉 *Поздравляем! Регистрация успешно завершена!*\n\n' +
+                 '💰 Для начала заработка сделайте первый депозит от $50.\n\n' +
+                 '🎁 *Специальный бонус:* Используйте промо-код **50START** для получения дополнительного бонуса!\n\n' +
+                 '👇 Нажмите кнопку ниже для пополнения депозита:';
+        depositUrl = 'https://po-ru4.click/cabinet/demo-high-low/?try-demo=1&redirectUrl=cabinet/deposit-step-1&utm_campaign=764996&utm_source=affiliate&utm_medium=sr&a=qjU9XsMF2HJcK3&ac=bot&code=50START';
+      }
+
+      const keyboard = {
+        inline_keyboard: [
+          [{
+            text: lang === 'en' ? '💰 Make Deposit ($50+)' : '💰 Пополнить депозит ($50+)',
+            url: depositUrl
+          }]
+        ]
+      };
+
+      await this.bot.sendMessage(user.telegram_id, message, {
+        parse_mode: 'Markdown',
+        reply_markup: keyboard
+      });
 
       this.logger.info(`Registration confirmed for user ${user.telegram_id}`);
 
