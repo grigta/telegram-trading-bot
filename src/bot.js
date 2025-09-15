@@ -129,14 +129,15 @@ class TradingBot {
   }
 
   async showLanguageSelection(chatId) {
-    const sent = await this.bot.sendMessage(chatId, translator.get('chooseLanguage', 'ru'), {
+    await messageManager.deleteLastMessage(this.bot, chatId);
+    await messageManager.sendMessage(this.bot, chatId, translator.get('chooseLanguage', 'ru'), {
       reply_markup: translator.getLanguageButtons()
     });
-    messageManager.setLastMessage(chatId, sent.message_id);
   }
 
   async requestPhoneNumber(chatId, lang) {
-    const sent = await this.bot.sendMessage(chatId, translator.get('sharePhone', lang), {
+    await messageManager.deleteLastMessage(this.bot, chatId);
+    await messageManager.sendMessage(this.bot, chatId, translator.get('sharePhone', lang), {
       reply_markup: {
         keyboard: [
           [{
@@ -148,7 +149,6 @@ class TradingBot {
         one_time_keyboard: true
       }
     });
-    messageManager.setLastMessage(chatId, sent.message_id);
   }
 
   async handleContact(msg) {
@@ -206,7 +206,7 @@ class TradingBot {
       this.logger.info(`User shared phone: ${userId}, phone: ${cleanPhone}`);
 
       // Send confirmation message
-      await this.bot.sendMessage(msg.chat.id,
+      await messageManager.sendMessage(this.bot, msg.chat.id,
         translator.get('phoneSuccess', lang),
         {
           parse_mode: 'Markdown',
@@ -261,16 +261,18 @@ class TradingBot {
       // Route callback to appropriate handler
       if (data.startsWith('lang_')) {
         await this.handleLanguageCallback(query);
+        // Language callback answers itself
       } else if (data.startsWith('admin_')) {
         await this.adminHandler.handleCallback(query);
-      } else if (data === 'check_subscription') {
+        // Admin callback answers itself
+      } else if (data === 'check_subscription' || data === 'subscription_help') {
         await this.subscriptionChecker.handleSubscriptionCallback(query);
+        // Subscription callback answers itself
       } else {
         await this.menuHandler.handleCallback(query);
+        // Answer callback query for menu handlers
+        await this.bot.answerCallbackQuery(query.id);
       }
-
-      // Answer callback query
-      await this.bot.answerCallbackQuery(query.id);
 
     } catch (error) {
       this.logger.error('Error in handleCallback', error);
@@ -298,7 +300,7 @@ class TradingBot {
         return;
       }
 
-      const selectedLang = data.replace('lang_', '');
+      const selectedLang = data.replace('lang_', '').replace('_settings', '');
 
       // Validate language
       if (!translator.isValidLanguage(selectedLang)) {
@@ -324,30 +326,27 @@ class TradingBot {
       await this.db.logUserAction(userId, 'language_changed', { language: selectedLang });
 
       // Send confirmation
-      await this.bot.editMessageText(translator.get('languageChanged', selectedLang), {
-        chat_id: chatId,
-        message_id: query.message.message_id
-      });
-
-      // Send welcome message
-      const welcomeMessage = await this.bot.sendMessage(chatId, translator.get('welcome', selectedLang), {
-        parse_mode: 'Markdown'
-      });
-
-      if (isNewUser && welcomeMessage && welcomeMessage.message_id) {
-        setTimeout(() => {
-          this.bot.deleteMessage(chatId, welcomeMessage.message_id).catch(() => {});
-        }, 3000);
-      }
-      messageManager.setLastMessage(chatId, welcomeMessage.message_id);
+      await messageManager.editMessageText(this.bot, chatId, query.message.message_id,
+        translator.get('languageChanged', selectedLang));
 
       // Continue with subscription check or phone request
       user = await this.db.getUserByTelegramId(userId);
 
+      // Check if this was a language change from settings
+      const isFromSettings = data.includes('_settings');
+
       // Small delay to let the confirmation message show
       setTimeout(async () => {
-        if (process.env.CHANNEL_USERNAME) {
-          await this.subscriptionChecker.handleSubscriptionCheck(query.message, selectedLang);
+        if (isFromSettings) {
+          // If user changed language from settings, return to settings
+          await this.menuHandler.handleSettings(query, selectedLang);
+        } else if (process.env.CHANNEL_USERNAME) {
+          // Create proper message object for subscription check
+          const messageObj = {
+            from: query.from,
+            chat: query.message.chat
+          };
+          await this.subscriptionChecker.handleSubscriptionCheck(messageObj, selectedLang);
         } else if (!user.phone) {
           await this.requestPhoneNumber(chatId, selectedLang);
         } else {
@@ -378,7 +377,7 @@ class TradingBot {
       case 'waiting_broadcast_text':
         await this.adminHandler.handleBroadcastText(msg);
         break;
-      default:
+      default: {
         // For unknown messages, show main menu
         const user = await this.db.getUserByTelegramId(userId);
         if (user && user.phone) {
@@ -387,6 +386,7 @@ class TradingBot {
           await this.subscriptionChecker.handleSubscriptionCheck(msg);
         }
         break;
+      }
       }
 
     } catch (error) {
@@ -402,7 +402,7 @@ class TradingBot {
       if (userId) {
         lang = await this.db.getUserLanguage(userId);
       }
-      await this.bot.sendMessage(chatId, translator.get('error', lang));
+      await messageManager.sendMessage(this.bot, chatId, translator.get('error', lang));
     } catch (error) {
       this.logger.error('Failed to send error message', error);
     }
@@ -414,6 +414,9 @@ class TradingBot {
       await this.postbackHandler.stopServer();
       await this.db.close();
       await this.bot.stopPolling();
+
+      // Clear all message queues and caches
+      this.processedCallbacks.clear();
       console.log('✅ Bot shutdown complete');
       process.exit(0);
     } catch (error) {

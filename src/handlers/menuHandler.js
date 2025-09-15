@@ -1,4 +1,3 @@
-const translator = require('../localization/translations');
 const messageManager = require('../utils/messageManager');
 
 class MenuHandler {
@@ -34,7 +33,8 @@ class MenuHandler {
             { text: lang === 'en' ? '🎁 VIP Bonus' : '🎁 VIP бонус', callback_data: 'vip_bonus' },
             { text: lang === 'en' ? '📄 FAQ' : '📄 Частые вопросы', callback_data: 'faq' }
           ],
-          [{ text: lang === 'en' ? '🔗 Pocket Option' : '🔗 Pocket Option', callback_data: 'pocket_option' }]
+          [{ text: lang === 'en' ? '🔗 Pocket Option' : '🔗 Pocket Option', callback_data: 'pocket_option' }],
+          [{ text: lang === 'en' ? '⚙️ Settings' : '⚙️ Настройки', callback_data: 'settings' }]
         ]
       };
 
@@ -671,8 +671,8 @@ After registration and deposit, contact support to get your access.
     const keyboard = {
       inline_keyboard: [
         [
-          { text: '🇷🇺 Русский', callback_data: 'lang_ru' },
-          { text: '🇬🇧 English', callback_data: 'lang_en' }
+          { text: '🇷🇺 Русский', callback_data: 'lang_ru_settings' },
+          { text: '🇬🇧 English', callback_data: 'lang_en_settings' }
         ],
         [{ text: lang === 'en' ? '← Back' : '← Назад', callback_data: 'settings' }]
       ]

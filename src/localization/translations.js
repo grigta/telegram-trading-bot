@@ -93,7 +93,7 @@ class Translator {
   }
 
   isValidLanguage(lang) {
-    return this.translations.hasOwnProperty(lang);
+    return Object.prototype.hasOwnProperty.call(this.translations, lang);
   }
 }
 

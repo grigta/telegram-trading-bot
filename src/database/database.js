@@ -53,21 +53,21 @@ class Database {
   async runAdditionalMigrations() {
     // Check if language column exists and add it if missing
     try {
-      const checkColumnSql = "PRAGMA table_info(users)";
+      const checkColumnSql = 'PRAGMA table_info(users)';
       const columns = await this.query(checkColumnSql);
       const hasLanguageColumn = columns.some(col => col.name === 'language');
       const hasLanguageSelectedColumn = columns.some(col => col.name === 'language_selected');
 
       if (!hasLanguageColumn) {
         console.log('📝 Adding language column to users table...');
-        const addColumnSql = "ALTER TABLE users ADD COLUMN language VARCHAR(5) DEFAULT 'ru'";
+        const addColumnSql = 'ALTER TABLE users ADD COLUMN language VARCHAR(5) DEFAULT \'ru\'';
         await this.run(addColumnSql);
         console.log('✅ Language column added successfully');
       }
 
       if (!hasLanguageSelectedColumn) {
         console.log('📝 Adding language_selected column to users table...');
-        const addColumnSql = "ALTER TABLE users ADD COLUMN language_selected BOOLEAN DEFAULT FALSE";
+        const addColumnSql = 'ALTER TABLE users ADD COLUMN language_selected BOOLEAN DEFAULT FALSE';
         await this.run(addColumnSql);
         console.log('✅ Language_selected column added successfully');
       }
@@ -81,35 +81,35 @@ class Database {
 
       if (!hasPartnerStatusColumn) {
         console.log('📝 Adding partner_status column to users table...');
-        const addColumnSql = "ALTER TABLE users ADD COLUMN partner_status VARCHAR(50) DEFAULT NULL";
+        const addColumnSql = 'ALTER TABLE users ADD COLUMN partner_status VARCHAR(50) DEFAULT NULL';
         await this.run(addColumnSql);
         console.log('✅ Partner_status column added successfully');
       }
 
       if (!hasPartnerIdColumn) {
         console.log('📝 Adding partner_id column to users table...');
-        const addColumnSql = "ALTER TABLE users ADD COLUMN partner_id VARCHAR(255) DEFAULT NULL";
+        const addColumnSql = 'ALTER TABLE users ADD COLUMN partner_id VARCHAR(255) DEFAULT NULL';
         await this.run(addColumnSql);
         console.log('✅ Partner_id column added successfully');
       }
 
       if (!hasFirstDepositAmountColumn) {
         console.log('📝 Adding first_deposit_amount column to users table...');
-        const addColumnSql = "ALTER TABLE users ADD COLUMN first_deposit_amount DECIMAL(10,2) DEFAULT NULL";
+        const addColumnSql = 'ALTER TABLE users ADD COLUMN first_deposit_amount DECIMAL(10,2) DEFAULT NULL';
         await this.run(addColumnSql);
         console.log('✅ First_deposit_amount column added successfully');
       }
 
       if (!hasFirstDepositDateColumn) {
         console.log('📝 Adding first_deposit_date column to users table...');
-        const addColumnSql = "ALTER TABLE users ADD COLUMN first_deposit_date DATETIME DEFAULT NULL";
+        const addColumnSql = 'ALTER TABLE users ADD COLUMN first_deposit_date DATETIME DEFAULT NULL';
         await this.run(addColumnSql);
         console.log('✅ First_deposit_date column added successfully');
       }
 
       if (!hasVipStatusColumn) {
         console.log('📝 Adding vip_status column to users table...');
-        const addColumnSql = "ALTER TABLE users ADD COLUMN vip_status BOOLEAN DEFAULT FALSE";
+        const addColumnSql = 'ALTER TABLE users ADD COLUMN vip_status BOOLEAN DEFAULT FALSE';
         await this.run(addColumnSql);
         console.log('✅ Vip_status column added successfully');
       }

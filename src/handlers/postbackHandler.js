@@ -289,21 +289,21 @@ class PostbackHandler {
 
       let message;
       if (lang === 'en') {
-        message = `🎉 *VIP ACCESS UNLOCKED!*\n\n` +
+        message = '🎉 *VIP ACCESS UNLOCKED!*\n\n' +
                  `Your deposit of $${depositAmount} has been confirmed!\n\n` +
-                 `You now have access to:\n` +
-                 `🔔 Private trading signals\n` +
-                 `📈 Exclusive market analysis\n` +
-                 `💼 Personal trading consultation\n\n` +
-                 `Welcome to the VIP club! 🌟`;
+                 'You now have access to:\n' +
+                 '🔔 Private trading signals\n' +
+                 '📈 Exclusive market analysis\n' +
+                 '💼 Personal trading consultation\n\n' +
+                 'Welcome to the VIP club! 🌟';
       } else {
-        message = `🎉 *VIP ДОСТУП ОТКРЫТ!*\n\n` +
+        message = '🎉 *VIP ДОСТУП ОТКРЫТ!*\n\n' +
                  `Ваш депозит в размере $${depositAmount} подтвержден!\n\n` +
-                 `Теперь у вас есть доступ к:\n` +
-                 `🔔 Приватным торговым сигналам\n` +
-                 `📈 Эксклюзивной аналитике рынка\n` +
-                 `💼 Персональным торговым консультациям\n\n` +
-                 `Добро пожаловать в VIP клуб! 🌟`;
+                 'Теперь у вас есть доступ к:\n' +
+                 '🔔 Приватным торговым сигналам\n' +
+                 '📈 Эксклюзивной аналитике рынка\n' +
+                 '💼 Персональным торговым консультациям\n\n' +
+                 'Добро пожаловать в VIP клуб! 🌟';
       }
 
       await this.bot.sendMessage(user.telegram_id, message, {
@@ -339,13 +339,14 @@ class PostbackHandler {
 
   startServer(port = 3000) {
     return new Promise((resolve, reject) => {
-      this.server = this.app.listen(port, (error) => {
+      // Bind to all interfaces (0.0.0.0) to accept external connections
+      this.server = this.app.listen(port, '0.0.0.0', (error) => {
         if (error) {
           this.logger.error('Failed to start postback server', error);
           reject(error);
         } else {
-          this.logger.info(`Postback server started on port ${port}`);
-          console.log(`🌐 Postback server running on port ${port}`);
+          this.logger.info(`Postback server started on 0.0.0.0:${port}`);
+          console.log(`🌐 Postback server running on 0.0.0.0:${port}`);
           resolve();
         }
       });

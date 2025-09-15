@@ -1,11 +1,10 @@
-const translator = require('../localization/translations');
-
 class SubscriptionChecker {
   constructor(bot, database, logger) {
     this.bot = bot;
     this.db = database;
     this.logger = logger;
     this.channelUsername = process.env.CHANNEL_USERNAME || '@your_channel';
+    this.channelInviteLink = process.env.CHANNEL_INVITE_LINK || 'https://t.me/your_channel';
   }
 
   async checkSubscription(userId, retryCount = 0) {
@@ -108,16 +107,22 @@ class SubscriptionChecker {
 
   async handleSubscriptionCallback(query) {
     const userId = query.from.id;
-    const data = query.callback_data;
+    const data = query.callback_data || query.data;
+
+    this.logger.info('handleSubscriptionCallback called', { userId, data });
 
     try {
       if (data === 'check_subscription') {
+        this.logger.info('Processing check_subscription callback', { userId });
         await this.handleCheckSubscription(query);
       } else if (data === 'subscription_help') {
+        this.logger.info('Processing subscription_help callback', { userId });
         await this.showSubscriptionHelp(query);
+      } else {
+        this.logger.warn('Unknown subscription callback data', { userId, data });
       }
     } catch (error) {
-      this.logger.error('Error in handleSubscriptionCallback', { userId, data, error: error.message });
+      this.logger.error('Error in handleSubscriptionCallback', { userId, data, error: error.message, stack: error.stack });
       await this.bot.answerCallbackQuery(query.id, { text: 'Произошла ошибка' });
     }
   }
@@ -125,12 +130,18 @@ class SubscriptionChecker {
   async handleCheckSubscription(query) {
     const userId = query.from.id;
 
+    this.logger.info('handleCheckSubscription called', { userId });
+
     try {
       // Show loading message
       const lang = await this.db.getUserLanguage(userId);
+      this.logger.info('Got user language', { userId, lang });
+
       await this.bot.answerCallbackQuery(query.id, {
         text: lang === 'en' ? '🔄 Checking subscription...' : '🔄 Проверяем подписку...'
       });
+
+      this.logger.info('Answered callback query with loading message', { userId });
 
       const isSubscribed = await this.checkSubscription(userId);
 
@@ -171,7 +182,7 @@ class SubscriptionChecker {
           inline_keyboard: [
             [{
               text: lang === 'en' ? '📢 Subscribe to channel' : '📢 Подписаться на канал',
-              url: `https://t.me/${this.channelUsername.substring(1)}`
+              url: this.channelInviteLink
             }],
             [{
               text: lang === 'en' ? '🔄 Check again' : '🔄 Проверить еще раз',
@@ -246,16 +257,14 @@ If you're having trouble subscribing:
   }
 
   async showSubscriptionPrompt(msg, lang = 'ru') {
-    const channelLink = `https://t.me/${this.channelUsername.substring(1)}`;
-
     const keyboard = {
       inline_keyboard: [
         [{
           text: lang === 'en' ? '📢 Subscribe to the channel' : '📢 Подписаться на канал',
-          url: channelLink
+          url: this.channelInviteLink
         }],
         [{
-          text: lang === 'en' ? "✅ I've subscribed!" : '✅ Я подписался!',
+          text: lang === 'en' ? '✅ I\'ve subscribed!' : '✅ Я подписался!',
           callback_data: 'check_subscription'
         }],
         [{
@@ -300,7 +309,7 @@ If you're having trouble subscribing:
 
     await this.db.logUserAction(msg.from.id, 'subscription_prompt_shown', {
       channel: this.channelUsername,
-      link: channelLink
+      link: this.channelInviteLink
     });
 
     this.logger.info(`Subscription prompt shown to user: ${msg.from.id}`);
