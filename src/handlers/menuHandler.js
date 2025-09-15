@@ -1,4 +1,5 @@
 const translator = require('../localization/translations');
+const messageManager = require('../utils/messageManager');
 
 class MenuHandler {
   constructor(bot, database, logger) {
@@ -71,10 +72,32 @@ ${greeting}
 _Выберите любой пункт меню для начала:_
       `;
 
-      await this.bot.sendMessage(chatId, message, {
-        parse_mode: 'Markdown',
-        reply_markup: keyboard
-      });
+      // Try to edit last message, otherwise send a new one
+      const lastId = messageManager.getLastMessage(chatId);
+      if (lastId) {
+        try {
+          await this.bot.editMessageText(message, {
+            chat_id: chatId,
+            message_id: lastId,
+            parse_mode: 'Markdown',
+            reply_markup: keyboard
+          });
+          // keep same lastId
+        } catch (e) {
+          const sent = await this.bot.sendMessage(chatId, message, {
+            parse_mode: 'Markdown',
+            reply_markup: keyboard
+          });
+          messageManager.setLastMessage(chatId, sent.message_id);
+          await messageManager.deleteLastMessage(this.bot, chatId);
+        }
+      } else {
+        const sent = await this.bot.sendMessage(chatId, message, {
+          parse_mode: 'Markdown',
+          reply_markup: keyboard
+        });
+        messageManager.setLastMessage(chatId, sent.message_id);
+      }
 
       // Log menu display
       await this.db.logUserAction(userId || chatId, 'main_menu_shown', {

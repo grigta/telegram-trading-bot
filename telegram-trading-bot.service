@@ -6,6 +6,7 @@ After=network.target
 Type=simple
 User=ubuntu
 WorkingDirectory=/opt/telegram-trading-bot
+EnvironmentFile=/opt/telegram-trading-bot/.env
 Environment=NODE_ENV=production
 ExecStart=/usr/bin/node index.js
 Restart=always

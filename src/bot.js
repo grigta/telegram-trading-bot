@@ -8,6 +8,7 @@ const PostbackHandler = require('./handlers/postbackHandler');
 const AntiSpam = require('./services/antiSpam');
 const Logger = require('./utils/logger');
 const translator = require('./localization/translations');
+const messageManager = require('./utils/messageManager');
 
 class TradingBot {
   constructor(token) {
@@ -128,9 +129,10 @@ class TradingBot {
   }
 
   async showLanguageSelection(chatId) {
-    await this.bot.sendMessage(chatId, translator.get('chooseLanguage', 'ru'), {
+    const sent = await this.bot.sendMessage(chatId, translator.get('chooseLanguage', 'ru'), {
       reply_markup: translator.getLanguageButtons()
     });
+    messageManager.setLastMessage(chatId, sent.message_id);
   }
 
   async requestPhoneNumber(chatId, lang) {
@@ -336,6 +338,7 @@ class TradingBot {
           this.bot.deleteMessage(chatId, welcomeMessage.message_id).catch(() => {});
         }, 3000);
       }
+      messageManager.setLastMessage(chatId, welcomeMessage.message_id);
 
       // Continue with subscription check or phone request
       user = await this.db.getUserByTelegramId(userId);
