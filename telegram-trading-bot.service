@@ -1,0 +1,18 @@
+[Unit]
+Description=Telegram Trading Bot
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/opt/telegram-trading-bot
+Environment=NODE_ENV=production
+ExecStart=/usr/bin/node index.js
+Restart=always
+RestartSec=5
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=telegram-trading-bot
+
+[Install]
+WantedBy=multi-user.target
