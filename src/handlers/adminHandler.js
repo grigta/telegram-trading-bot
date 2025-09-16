@@ -475,11 +475,6 @@ ${messagePreview}
         reply_markup: keyboard
       });
 
-      // Clear user state
-      if (this.userStates) {
-        this.userStates.clearState(adminId);
-      }
-
     } catch (error) {
       this.logger.error('Error handling broadcast text', error);
       await this.bot.sendMessage(msg.chat.id, '❌ Ошибка при обработке сообщения для рассылки.');
@@ -522,6 +517,11 @@ ${messagePreview}
       // Clean up settings
       await this.db.setSetting(`broadcast_context_${adminId}`, null);
       await this.db.setSetting(`broadcast_message_${adminId}`, null);
+
+      // Clear user state
+      if (this.userStates) {
+        this.userStates.clearState(adminId);
+      }
 
     } catch (error) {
       this.logger.error('Error confirming broadcast', error);
