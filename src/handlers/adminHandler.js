@@ -47,6 +47,12 @@ class AdminHandler {
       return;
     }
 
+    if (!data) {
+      this.logger.warn(`Admin callback data is undefined for user: ${userId}`);
+      await this.bot.answerCallbackQuery(query.id, { text: 'Ошибка: данные не получены' });
+      return;
+    }
+
     try {
       switch (data) {
       case 'admin_stats':
@@ -85,7 +91,7 @@ class AdminHandler {
         break;
       }
     } catch (error) {
-      this.logger.error('Error in admin callback', { userId, data, error: error.message });
+      this.logger.error('Error in admin callback', { userId, data: data || 'undefined', error: error.message });
       await this.bot.answerCallbackQuery(query.id, { text: 'Произошла ошибка' });
     }
   }

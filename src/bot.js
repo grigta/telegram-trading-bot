@@ -252,6 +252,9 @@ class TradingBot {
       if (!data) {
         this.logger.warn(`Callback data is undefined for user: ${userId}`);
         this.logger.warn(`Query keys: ${Object.keys(query)}`);
+        this.logger.warn(`Query.callback_data: ${query.callback_data}`);
+        this.logger.warn(`Query.data: ${query.data}`);
+        this.logger.warn(`Full query:`, JSON.stringify(query, null, 2));
         await this.bot.answerCallbackQuery(query.id, { text: 'Ошибка: данные не получены' });
         return;
       }
