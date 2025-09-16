@@ -478,9 +478,11 @@ class AdminHandler {
       // Show confirmation
       let messagePreview = '';
       if (msg.text) {
-        messagePreview = msg.text.length > 100 ? msg.text.substring(0, 100) + '...' : msg.text;
+        const rawText = msg.text.length > 100 ? msg.text.substring(0, 100) + '...' : msg.text;
+        messagePreview = this.escapeMarkdown(rawText);
       } else if (msg.caption) {
-        messagePreview = msg.caption.length > 100 ? msg.caption.substring(0, 100) + '...' : msg.caption;
+        const rawCaption = msg.caption.length > 100 ? msg.caption.substring(0, 100) + '...' : msg.caption;
+        messagePreview = this.escapeMarkdown(rawCaption);
       } else if (msg.photo) {
         messagePreview = '[Фото без подписи]';
       } else if (msg.video) {
@@ -495,6 +497,8 @@ class AdminHandler {
         messagePreview += `\n\n🔘 Кнопок: ${buttonCount}`;
       }
 
+      this.logger.debug(`Message preview (escaped): ${messagePreview}`);
+
       const confirmMessage = `✅ *Подтверждение рассылки*
 
 📊 Аудитория: ${this.getBroadcastTypeName(context.type)}
@@ -503,7 +507,7 @@ class AdminHandler {
 📝 Предварительный просмотр:
 ${messagePreview}
 
-⚠️ **Внимание!** После подтверждения рассылка начнется немедленно и не может быть остановлена.`;
+⚠️ *Внимание!* После подтверждения рассылка начнется немедленно и не может быть остановлена.`;
 
       const keyboard = {
         inline_keyboard: [
@@ -521,13 +525,18 @@ ${messagePreview}
 
       try {
         this.logger.debug(`About to call bot.editMessageText...`);
+        this.logger.debug(`Final confirmation message:`, confirmMessage);
 
-        const editResult = await this.bot.editMessageText(confirmMessage, {
+        const editParams = {
           chat_id: context.chatId,
           message_id: context.messageId,
           parse_mode: 'Markdown',
           reply_markup: keyboard
-        });
+        };
+
+        this.logger.debug(`Edit parameters:`, JSON.stringify(editParams, null, 2));
+
+        const editResult = await this.bot.editMessageText(confirmMessage, editParams);
 
         this.logger.info(`Successfully created broadcast confirmation message for admin ${adminId}`);
         this.logger.debug(`Edit result:`, editResult);
