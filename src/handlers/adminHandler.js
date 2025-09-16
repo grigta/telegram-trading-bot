@@ -436,7 +436,12 @@ class AdminHandler {
       deposit: 'С депозитом',
       vip: 'VIP пользователи'
     };
-    return names[type] || 'Неизвестный тип';
+
+    this.logger.debug(`getBroadcastTypeName called with type: "${type}"`);
+    const result = names[type] || 'Неизвестный тип';
+    this.logger.debug(`getBroadcastTypeName returning: "${result}"`);
+
+    return result;
   }
 
   async handleBroadcastText(msg) {
