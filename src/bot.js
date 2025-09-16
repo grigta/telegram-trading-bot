@@ -246,16 +246,30 @@ class TradingBot {
         oldCallbacks.forEach(id => this.processedCallbacks.delete(id));
       }
 
-      this.logger.info(`Callback query: ${userId}, data: ${data}`);
+      // Enhanced logging for debugging callback issues
+      this.logger.info(`Callback query received from user ${userId}`);
+      this.logger.debug(`Raw callback_data: "${query.callback_data}"`);
+      this.logger.debug(`Raw data field: "${query.data}"`);
+      this.logger.debug(`Processed data: "${data}"`);
+
+      this.logger.info(`Callback query: ${userId}, data: "${data || 'UNDEFINED'}"`);
 
       // Check if data is undefined or null
       if (!data) {
-        this.logger.warn(`Callback data is undefined for user: ${userId}`);
-        this.logger.warn(`Query keys: ${Object.keys(query)}`);
-        this.logger.warn(`Query.callback_data: ${query.callback_data}`);
-        this.logger.warn(`Query.data: ${query.data}`);
-        this.logger.warn(`Full query:`, JSON.stringify(query, null, 2));
-        await this.bot.answerCallbackQuery(query.id, { text: 'Ошибка: данные не получены' });
+        this.logger.error(`CRITICAL: Callback data is undefined for user: ${userId}`);
+        this.logger.error(`Query keys available: ${Object.keys(query).join(', ')}`);
+        this.logger.error(`Query.callback_data: "${query.callback_data}"`);
+        this.logger.error(`Query.data: "${query.data}"`);
+        this.logger.error(`Query.id: "${query.id}"`);
+        this.logger.error(`Query.from: ${JSON.stringify(query.from)}`);
+        this.logger.error(`Query.message exists: ${!!query.message}`);
+
+        // Try to extract data from message if available
+        if (query.message && query.message.reply_markup) {
+          this.logger.error(`Message reply_markup:`, JSON.stringify(query.message.reply_markup, null, 2));
+        }
+
+        await this.bot.answerCallbackQuery(query.id, { text: 'Ошибка: данные callback не получены' });
         return;
       }
 

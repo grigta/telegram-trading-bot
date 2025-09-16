@@ -43,53 +43,87 @@ class AdminHandler {
     const userId = query.from.id;
     const data = query.callback_data || query.data;
 
+    this.logger.info(`ADMIN HANDLER: Callback received from user ${userId}`);
+    this.logger.debug(`ADMIN HANDLER: Raw query.callback_data: "${query.callback_data}"`);
+    this.logger.debug(`ADMIN HANDLER: Raw query.data: "${query.data}"`);
+    this.logger.debug(`ADMIN HANDLER: Processed data: "${data}"`);
+    this.logger.debug(`ADMIN HANDLER: Query ID: ${query.id}`);
+
     if (!this.isAdmin(userId)) {
+      this.logger.warn(`ADMIN HANDLER: Non-admin user ${userId} attempted to access admin functions`);
       await this.bot.answerCallbackQuery(query.id, { text: 'Доступ запрещен' });
       return;
     }
 
     if (!data) {
-      this.logger.warn(`Admin callback data is undefined for user: ${userId}`);
-      this.logger.warn(`Admin query.callback_data: ${query.callback_data}`);
-      this.logger.warn(`Admin query.data: ${query.data}`);
-      await this.bot.answerCallbackQuery(query.id, { text: 'Ошибка: данные не получены' });
+      this.logger.error(`ADMIN: Callback data is undefined for user: ${userId}`);
+      this.logger.error(`ADMIN: query.callback_data: "${query.callback_data}"`);
+      this.logger.error(`ADMIN: query.data: "${query.data}"`);
+      this.logger.error(`ADMIN: query.id: "${query.id}"`);
+      this.logger.error(`ADMIN: Available query keys: ${Object.keys(query).join(', ')}`);
+
+      // Log the full query object for debugging
+      this.logger.error(`ADMIN: Full query object:`, JSON.stringify(query, null, 2));
+
+      await this.bot.answerCallbackQuery(query.id, { text: 'Ошибка: данные администратора не получены' });
+
+      // Try to redirect back to admin menu
+      try {
+        await this.showAdminMenu(query);
+      } catch (e) {
+        this.logger.error('Failed to show admin menu after callback data error', e);
+      }
       return;
     }
 
     try {
       switch (data) {
       case 'admin_stats':
+        await this.bot.answerCallbackQuery(query.id);
         await this.showStats(query);
         break;
       case 'admin_users':
+        await this.bot.answerCallbackQuery(query.id);
         await this.showUsers(query, 1);
         break;
       case 'admin_broadcast':
+        await this.bot.answerCallbackQuery(query.id);
         await this.handleBroadcast(query);
         break;
       case 'admin_logs':
+        await this.bot.answerCallbackQuery(query.id);
         await this.showLogs(query, 1);
         break;
       case 'admin_settings':
+        await this.bot.answerCallbackQuery(query.id);
         await this.showSettings(query);
         break;
       case 'admin_menu':
+        await this.bot.answerCallbackQuery(query.id);
         await this.showAdminMenu(query);
         break;
       default:
         if (data.startsWith('admin_users_')) {
+          await this.bot.answerCallbackQuery(query.id);
           const page = parseInt(data.split('_')[2]) || 1;
           await this.showUsers(query, page);
         } else if (data.startsWith('admin_logs_')) {
+          await this.bot.answerCallbackQuery(query.id);
           const page = parseInt(data.split('_')[2]) || 1;
           await this.showLogs(query, page);
         } else if (data.startsWith('broadcast_')) {
+          await this.bot.answerCallbackQuery(query.id);
           const type = data.replace('broadcast_', '');
           await this.startBroadcast(query, type);
         } else if (data === 'broadcast_cancel') {
+          await this.bot.answerCallbackQuery(query.id);
           await this.cancelBroadcast(query);
         } else if (data === 'broadcast_confirm') {
+          // Note: confirmBroadcast handles its own answerCallbackQuery
           await this.confirmBroadcast(query);
+        } else {
+          this.logger.warn(`Unknown admin callback data: ${data}`);
+          await this.bot.answerCallbackQuery(query.id, { text: 'Неизвестная команда' });
         }
         break;
       }
@@ -468,12 +502,22 @@ ${messagePreview}
         ]
       };
 
-      await this.bot.editMessageText(confirmMessage, {
-        chat_id: context.chatId,
-        message_id: context.messageId,
-        parse_mode: 'Markdown',
-        reply_markup: keyboard
-      });
+      this.logger.info(`Creating broadcast confirmation keyboard for admin ${adminId}`);
+      this.logger.debug(`Keyboard structure:`, JSON.stringify(keyboard, null, 2));
+      this.logger.debug(`Context: chatId=${context.chatId}, messageId=${context.messageId}`);
+
+      try {
+        await this.bot.editMessageText(confirmMessage, {
+          chat_id: context.chatId,
+          message_id: context.messageId,
+          parse_mode: 'Markdown',
+          reply_markup: keyboard
+        });
+        this.logger.info(`Successfully created broadcast confirmation message for admin ${adminId}`);
+      } catch (error) {
+        this.logger.error(`Failed to create broadcast confirmation message for admin ${adminId}`, error);
+        throw error;
+      }
 
     } catch (error) {
       this.logger.error('Error handling broadcast text', error);
@@ -485,12 +529,22 @@ ${messagePreview}
     try {
       const adminId = query.from.id;
 
+      this.logger.info(`BROADCAST CONFIRM: Method called for admin ${adminId}`);
+      this.logger.debug(`BROADCAST CONFIRM: Query ID: ${query.id}`);
+      this.logger.debug(`BROADCAST CONFIRM: Query callback_data: "${query.callback_data}"`);
+
+      // Answer callback query immediately
+      await this.bot.answerCallbackQuery(query.id, { text: 'Обрабатываем рассылку...' });
+
       // Get context and message
       const contextStr = await this.db.getSetting(`broadcast_context_${adminId}`);
       const messageStr = await this.db.getSetting(`broadcast_message_${adminId}`);
 
+      this.logger.debug(`BROADCAST CONFIRM: Context found: ${!!contextStr}`);
+      this.logger.debug(`BROADCAST CONFIRM: Message found: ${!!messageStr}`);
+
       if (!contextStr || !messageStr) {
-        await this.bot.answerCallbackQuery(query.id, { text: '❌ Данные рассылки не найдены' });
+        this.logger.error(`BROADCAST CONFIRM: Missing data - context: ${!!contextStr}, message: ${!!messageStr}`);
         return;
       }
 
@@ -789,6 +843,17 @@ ${errorCount > 0 ? '⚠️ Некоторые сообщения не были �
     // Validate user ID before sending
     if (!userId || typeof userId !== 'number' || userId <= 0) {
       throw new Error(`Invalid user ID: ${userId}`);
+    }
+
+    // Additional validation: ensure this is a valid Telegram user ID
+    if (userId < 0) {
+      throw new Error(`Negative user ID detected (likely a group/channel): ${userId}`);
+    }
+
+    // Check if this looks like a group/channel ID (usually negative or very large)
+    if (userId.toString().startsWith('-') || userId > 9999999999) {
+      this.logger.warn(`Suspicious user ID that might be a group/channel: ${userId}`);
+      throw new Error(`Suspicious user ID detected: ${userId}`);
     }
 
     const options = {
