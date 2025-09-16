@@ -448,38 +448,51 @@ class AdminHandler {
     try {
       const adminId = msg.from.id;
 
+      this.logger.info(`=== HANDLE BROADCAST TEXT START === Admin: ${adminId}, Message: "${msg.text}"`);
+
       // Get broadcast context
-      this.logger.debug(`Getting broadcast context for admin ${adminId}`);
+      this.logger.debug(`Step 1: Getting broadcast context for admin ${adminId}`);
       const contextStr = await this.db.getSetting(`broadcast_context_${adminId}`);
+      this.logger.debug(`Step 1 Complete: Context string length: ${contextStr ? contextStr.length : 'null'}`);
+
       if (!contextStr) {
         this.logger.error(`No broadcast context found for admin ${adminId}`);
         await this.bot.sendMessage(msg.chat.id, '❌ Контекст рассылки не найден. Начните заново.');
         return;
       }
 
-      this.logger.debug(`Parsing broadcast context: ${contextStr}`);
+      this.logger.debug(`Step 2: Parsing broadcast context: ${contextStr}`);
       const context = JSON.parse(contextStr);
-      this.logger.debug(`Broadcast context type: ${context.type}`);
+      this.logger.debug(`Step 2 Complete: Context type: ${context.type}`);
 
-      this.logger.debug(`Getting user count for type: ${context.type}`);
+      this.logger.debug(`Step 3: Getting user count for type: ${context.type}`);
       const userCount = await this.getBroadcastUserCount(context.type);
-      this.logger.debug(`User count result: ${userCount}`);
+      this.logger.debug(`Step 3 Complete: User count result: ${userCount}`);
 
       // Store the broadcast message
-      await this.db.setSetting(`broadcast_message_${adminId}`, JSON.stringify({
+      this.logger.debug(`Step 4: Storing broadcast message for admin ${adminId}`);
+      const messageData = {
         text: msg.text,
         photo: msg.photo ? msg.photo[msg.photo.length - 1].file_id : null,
         video: msg.video ? msg.video.file_id : null,
         document: msg.document ? msg.document.file_id : null,
         caption: msg.caption || null,
         reply_markup: msg.reply_markup || null
-      }));
+      };
+      this.logger.debug(`Message data to store:`, messageData);
+
+      await this.db.setSetting(`broadcast_message_${adminId}`, JSON.stringify(messageData));
+      this.logger.debug(`Step 4 Complete: Message data stored`);
 
       // Show confirmation
+      this.logger.debug(`Step 5: Creating message preview`);
       let messagePreview = '';
       if (msg.text) {
+        this.logger.debug(`Processing text message: "${msg.text}"`);
         const rawText = msg.text.length > 100 ? msg.text.substring(0, 100) + '...' : msg.text;
+        this.logger.debug(`Raw text (truncated): "${rawText}"`);
         messagePreview = this.escapeMarkdown(rawText);
+        this.logger.debug(`Escaped text: "${messagePreview}"`);
       } else if (msg.caption) {
         const rawCaption = msg.caption.length > 100 ? msg.caption.substring(0, 100) + '...' : msg.caption;
         messagePreview = this.escapeMarkdown(rawCaption);
@@ -497,7 +510,7 @@ class AdminHandler {
         messagePreview += `\n\n🔘 Кнопок: ${buttonCount}`;
       }
 
-      this.logger.debug(`Message preview (escaped): ${messagePreview}`);
+      this.logger.debug(`Step 5 Complete: Message preview: "${messagePreview}"`);
 
       const confirmMessage = `✅ *Подтверждение рассылки*
 
