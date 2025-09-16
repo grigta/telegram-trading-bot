@@ -501,6 +501,26 @@ ${messagePreview}
       const users = await this.getBroadcastUsers(context.type);
       this.logger.info(`Broadcast confirmation: type=${context.type}, users found=${users.length}`, { adminId });
 
+      if (users.length === 0) {
+        await this.bot.editMessageText(
+          `❌ **Рассылка отменена**\n\nНе найдено пользователей для рассылки типа "${this.getBroadcastTypeName(context.type)}"`,
+          {
+            chat_id: query.message.chat.id,
+            message_id: query.message.message_id,
+            parse_mode: 'Markdown',
+            reply_markup: {
+              inline_keyboard: [
+                [{ text: '← Назад к рассылке', callback_data: 'admin_broadcast' }]
+              ]
+            }
+          }
+        );
+        return;
+      }
+
+      // Validate sample of users before starting broadcast
+      await this.validateActiveUsers(users);
+
       await this.bot.editMessageText(
         `🚀 **Рассылка запущена!**\n\n📊 Отправляется ${users.length} пользователям...\n\n⏳ Примерное время выполнения: ${Math.ceil(users.length / 20)} минут`,
         {
@@ -587,26 +607,105 @@ ${messagePreview}
       break;
     }
 
+    // Add validation for valid telegram IDs
+    sql += ' AND telegram_id IS NOT NULL AND telegram_id > 0';
+
+    this.logger.info(`getBroadcastUsers: type=${type}, executing SQL: ${sql}`);
+
     const users = await this.db.query(sql);
-    this.logger.info(`getBroadcastUsers: type=${type}, sql=${sql}, found=${users.length} users`);
-    return users;
+
+    // Validate user IDs and log details
+    const validUsers = users.filter(user => {
+      const isValid = user.telegram_id &&
+                     typeof user.telegram_id === 'number' &&
+                     user.telegram_id > 0 &&
+                     user.telegram_id < 10000000000; // Max valid Telegram ID range
+
+      if (!isValid) {
+        this.logger.warn(`Invalid user ID filtered out: ${user.telegram_id}`);
+      }
+      return isValid;
+    });
+
+    this.logger.info(`getBroadcastUsers: type=${type}, total found=${users.length}, valid=${validUsers.length} users`);
+
+    // Log first few user IDs for debugging
+    const sampleIds = validUsers.slice(0, 5).map(u => u.telegram_id);
+    this.logger.info(`Sample user IDs: ${sampleIds.join(', ')}`);
+
+    return validUsers;
+  }
+
+  async validateActiveUsers(users) {
+    this.logger.info(`Validating ${users.length} users for broadcast...`);
+    const activeUsers = [];
+    const inactiveUsers = [];
+
+    // Sample validation on first 5 users to check for major issues
+    const sampleSize = Math.min(5, users.length);
+    for (let i = 0; i < sampleSize; i++) {
+      const user = users[i];
+      try {
+        // Try to get chat info - this will fail if user blocked bot or deleted account
+        await this.bot.getChat(user.telegram_id);
+        this.logger.debug(`User ${user.telegram_id} is active`);
+      } catch (error) {
+        if (error.code === 403) {
+          this.logger.debug(`User ${user.telegram_id} has blocked the bot or deleted account`);
+          inactiveUsers.push(user.telegram_id);
+        } else if (error.code === 400) {
+          this.logger.debug(`User ${user.telegram_id} chat not found`);
+          inactiveUsers.push(user.telegram_id);
+        } else {
+          this.logger.warn(`Unexpected error checking user ${user.telegram_id}:`, error.message);
+        }
+      }
+    }
+
+    // If more than 50% of sample users are inactive, warn about it
+    if (inactiveUsers.length > sampleSize * 0.5) {
+      this.logger.warn(`High inactive user rate detected: ${inactiveUsers.length}/${sampleSize} users inactive`);
+    }
+
+    this.logger.info(`User validation complete. Proceeding with all ${users.length} users (sample check: ${sampleSize - inactiveUsers.length}/${sampleSize} active)`);
+    return users; // Return all users, but we've logged the sample validation
   }
 
   async executeBroadcast(users, broadcastMessage, adminChatId, adminId) {
     let sentCount = 0;
     let errorCount = 0;
+    let blockedCount = 0;
+    let invalidCount = 0;
     const startTime = Date.now();
 
-    this.logger.info(`Starting broadcast to ${users.length} users`, { adminId, type: 'broadcast_start' });
+    this.logger.info(`Starting broadcast to ${users.length} users`, {
+      adminId,
+      type: 'broadcast_start',
+      messageType: broadcastMessage.photo ? 'photo' : broadcastMessage.video ? 'video' : broadcastMessage.document ? 'document' : 'text'
+    });
 
-    for (const user of users) {
+    // Log broadcast message details
+    if (broadcastMessage.text) {
+      this.logger.info(`Broadcast text: ${broadcastMessage.text.substring(0, 100)}${broadcastMessage.text.length > 100 ? '...' : ''}`);
+    }
+
+    for (let i = 0; i < users.length; i++) {
+      const user = users[i];
       try {
         // Rate limiting: max 20 messages per second
         if (sentCount > 0 && sentCount % 20 === 0) {
+          this.logger.debug(`Rate limiting: pausing for 1 second after ${sentCount} messages`);
           await new Promise(resolve => setTimeout(resolve, 1000));
         }
 
-        this.logger.debug(`Sending broadcast message to user ${user.telegram_id}`);
+        // Additional validation before sending
+        if (!user || !user.telegram_id) {
+          this.logger.warn(`Skipping invalid user object at index ${i}:`, user);
+          invalidCount++;
+          continue;
+        }
+
+        this.logger.debug(`Sending broadcast message to user ${user.telegram_id} (${i + 1}/${users.length})`);
         await this.sendBroadcastMessage(user.telegram_id, broadcastMessage);
         sentCount++;
         this.logger.debug(`Successfully sent to user ${user.telegram_id}, total sent: ${sentCount}`);
@@ -616,19 +715,31 @@ ${messagePreview}
           const progress = Math.round((sentCount / users.length) * 100);
           try {
             await this.bot.sendMessage(adminChatId,
-              `📊 Прогресс рассылки: ${progress}% (${sentCount}/${users.length})`
+              `📊 Прогресс рассылки: ${progress}% (${sentCount}/${users.length})\n❌ Ошибок: ${errorCount}${blockedCount > 0 ? `\n🚫 Заблокировали: ${blockedCount}` : ''}`
             );
           } catch (e) {
-            // Ignore errors in progress updates
+            this.logger.warn('Failed to send progress update', e.message);
           }
         }
 
       } catch (error) {
         errorCount++;
-        this.logger.warn('Error sending broadcast message', {
-          userId: user.telegram_id,
-          error: error.message
-        });
+
+        // Categorize errors for better debugging
+        if (error.message.includes('blocked') || error.message.includes('bot was blocked') ||
+            error.code === 403 || error.response?.body?.error_code === 403) {
+          blockedCount++;
+          this.logger.debug(`User ${user.telegram_id} has blocked the bot`);
+        } else if (error.message.includes('chat not found') || error.code === 400) {
+          this.logger.warn(`Chat not found for user ${user.telegram_id}`, error.message);
+        } else {
+          this.logger.error(`Unexpected error sending to user ${user.telegram_id}`, {
+            userId: user.telegram_id,
+            error: error.message,
+            errorCode: error.code,
+            responseBody: error.response?.body
+          });
+        }
       }
     }
 
@@ -638,9 +749,11 @@ ${messagePreview}
 📊 Результаты:
 • Отправлено: ${sentCount}/${users.length}
 • Ошибок: ${errorCount}
+${blockedCount > 0 ? `• Заблокировали бота: ${blockedCount}` : ''}
+${invalidCount > 0 ? `• Некорректных ID: ${invalidCount}` : ''}
 • Время выполнения: ${duration} сек
 
-${errorCount > 0 ? '⚠️ Некоторые сообщения не были доставлены (пользователи заблокировали бота)' : ''}`;
+${errorCount > 0 ? '⚠️ Некоторые сообщения не были доставлены' : '🎉 Все сообщения доставлены успешно!'}`;
 
     try {
       await this.bot.sendMessage(adminChatId, resultMessage, { parse_mode: 'Markdown' });
@@ -648,11 +761,13 @@ ${errorCount > 0 ? '⚠️ Некоторые сообщения не были �
       this.logger.error('Error sending broadcast completion message', e);
     }
 
-    // Log broadcast completion
+    // Log broadcast completion with detailed statistics
     await this.db.logUserAction(adminId, 'broadcast_completed', {
       target_users: users.length,
       sent_count: sentCount,
       error_count: errorCount,
+      blocked_count: blockedCount,
+      invalid_count: invalidCount,
       duration_seconds: duration
     });
 
@@ -660,12 +775,22 @@ ${errorCount > 0 ? '⚠️ Некоторые сообщения не были �
       adminId,
       sentCount,
       errorCount,
+      blockedCount,
+      invalidCount,
       duration,
-      totalUsers: users.length
+      totalUsers: users.length,
+      successRate: users.length > 0 ? Math.round((sentCount / users.length) * 100) : 0
     });
   }
 
   async sendBroadcastMessage(userId, broadcastMessage) {
+    this.logger.debug(`Attempting to send broadcast message to user ${userId}`);
+
+    // Validate user ID before sending
+    if (!userId || typeof userId !== 'number' || userId <= 0) {
+      throw new Error(`Invalid user ID: ${userId}`);
+    }
+
     const options = {
       parse_mode: 'Markdown'
     };
@@ -675,17 +800,34 @@ ${errorCount > 0 ? '⚠️ Некоторые сообщения не были �
       options.reply_markup = broadcastMessage.reply_markup;
     }
 
-    if (broadcastMessage.photo) {
-      options.caption = broadcastMessage.caption;
-      await this.bot.sendPhoto(userId, broadcastMessage.photo, options);
-    } else if (broadcastMessage.video) {
-      options.caption = broadcastMessage.caption;
-      await this.bot.sendVideo(userId, broadcastMessage.video, options);
-    } else if (broadcastMessage.document) {
-      options.caption = broadcastMessage.caption;
-      await this.bot.sendDocument(userId, broadcastMessage.document, options);
-    } else {
-      await this.bot.sendMessage(userId, broadcastMessage.text, options);
+    try {
+      if (broadcastMessage.photo) {
+        options.caption = broadcastMessage.caption;
+        this.logger.debug(`Sending photo to user ${userId}`);
+        await this.bot.sendPhoto(userId, broadcastMessage.photo, options);
+      } else if (broadcastMessage.video) {
+        options.caption = broadcastMessage.caption;
+        this.logger.debug(`Sending video to user ${userId}`);
+        await this.bot.sendVideo(userId, broadcastMessage.video, options);
+      } else if (broadcastMessage.document) {
+        options.caption = broadcastMessage.caption;
+        this.logger.debug(`Sending document to user ${userId}`);
+        await this.bot.sendDocument(userId, broadcastMessage.document, options);
+      } else {
+        this.logger.debug(`Sending text message to user ${userId}: ${broadcastMessage.text?.substring(0, 50)}...`);
+        await this.bot.sendMessage(userId, broadcastMessage.text, options);
+      }
+      this.logger.debug(`Successfully sent broadcast message to user ${userId}`);
+    } catch (error) {
+      // Enhanced error logging
+      this.logger.error(`Failed to send broadcast message to user ${userId}`, {
+        error: error.message,
+        errorCode: error.code,
+        response: error.response?.body || 'No response body',
+        userId: userId,
+        messageType: broadcastMessage.photo ? 'photo' : broadcastMessage.video ? 'video' : broadcastMessage.document ? 'document' : 'text'
+      });
+      throw error; // Re-throw to be handled by calling function
     }
   }
 
