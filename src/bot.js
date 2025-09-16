@@ -265,7 +265,7 @@ class TradingBot {
       if (data.startsWith('lang_')) {
         await this.handleLanguageCallback(query);
         // Language callback answers itself
-      } else if (data.startsWith('admin_')) {
+      } else if (data.startsWith('admin_') || data.startsWith('broadcast_')) {
         await this.adminHandler.handleCallback(query);
         // Admin callback answers itself
       } else if (data === 'check_subscription' || data === 'subscription_help') {

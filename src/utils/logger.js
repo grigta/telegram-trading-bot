@@ -53,6 +53,12 @@ class Logger {
     const file = isError ? this.errorFile : this.logFile;
 
     try {
+      // Ensure directory exists before writing
+      const dir = path.dirname(file);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+
       fs.appendFileSync(file, content);
     } catch (error) {
       console.error('Failed to write to log file:', error);

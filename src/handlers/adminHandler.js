@@ -240,9 +240,10 @@ class AdminHandler {
 
       logs.slice(0, 10).forEach(log => {  // Limit to 10 for readability
         const time = new Date(log.timestamp).toLocaleString('ru-RU');
+        const action = this.escapeMarkdown(log.action || 'unknown');
         message += `🕒 ${time}\n`;
         message += `👤 ID: ${log.telegram_id}\n`;
-        message += `⚡️ ${log.action}\n\n`;
+        message += `⚡️ ${action}\n\n`;
       });
 
       const keyboard = {
@@ -683,6 +684,15 @@ ${errorCount > 0 ? '⚠️ Некоторые сообщения не были �
     } else {
       await this.bot.sendMessage(userId, broadcastMessage.text, options);
     }
+  }
+
+  escapeMarkdown(text) {
+    if (!text) return '';
+    return text
+      .replace(/[*_`[\]()~>#+=|{}.!-]/g, '\\$&')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/&/g, '&amp;');
   }
 }
 
