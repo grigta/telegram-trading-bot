@@ -1,8 +1,9 @@
 class AdminHandler {
-  constructor(bot, database, logger) {
+  constructor(bot, database, logger, userStates) {
     this.bot = bot;
     this.db = database;
     this.logger = logger;
+    this.userStates = userStates;
     this.adminIds = process.env.ADMIN_IDS ? process.env.ADMIN_IDS.split(',').map(Number) : [];
   }
 
@@ -355,10 +356,6 @@ class AdminHandler {
       });
 
       // Set user state to waiting for broadcast text
-      const UserStates = require('../utils/userStates');
-      if (!this.userStates) {
-        this.userStates = new UserStates();
-      }
       this.userStates.setState(adminId, 'waiting_broadcast_text');
 
     } catch (error) {

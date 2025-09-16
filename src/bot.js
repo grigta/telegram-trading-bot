@@ -20,7 +20,7 @@ class TradingBot {
 
     this.menuHandler = new MenuHandler(this.bot, this.db, this.logger);
     this.subscriptionChecker = new SubscriptionChecker(this.bot, this.db, this.logger);
-    this.adminHandler = new AdminHandler(this.bot, this.db, this.logger);
+    this.adminHandler = new AdminHandler(this.bot, this.db, this.logger, this.userStates);
     this.postbackHandler = new PostbackHandler(this.bot, this.db, this.logger);
 
     // Set to track processed callback queries to prevent duplicates
