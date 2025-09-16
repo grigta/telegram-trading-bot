@@ -449,14 +449,21 @@ class AdminHandler {
       const adminId = msg.from.id;
 
       // Get broadcast context
+      this.logger.debug(`Getting broadcast context for admin ${adminId}`);
       const contextStr = await this.db.getSetting(`broadcast_context_${adminId}`);
       if (!contextStr) {
+        this.logger.error(`No broadcast context found for admin ${adminId}`);
         await this.bot.sendMessage(msg.chat.id, '❌ Контекст рассылки не найден. Начните заново.');
         return;
       }
 
+      this.logger.debug(`Parsing broadcast context: ${contextStr}`);
       const context = JSON.parse(contextStr);
+      this.logger.debug(`Broadcast context type: ${context.type}`);
+
+      this.logger.debug(`Getting user count for type: ${context.type}`);
       const userCount = await this.getBroadcastUserCount(context.type);
+      this.logger.debug(`User count result: ${userCount}`);
 
       // Store the broadcast message
       await this.db.setSetting(`broadcast_message_${adminId}`, JSON.stringify({
@@ -510,17 +517,28 @@ ${messagePreview}
       this.logger.info(`Creating broadcast confirmation keyboard for admin ${adminId}`);
       this.logger.debug(`Keyboard structure:`, JSON.stringify(keyboard, null, 2));
       this.logger.debug(`Context: chatId=${context.chatId}, messageId=${context.messageId}`);
+      this.logger.debug(`Confirmation message length: ${confirmMessage.length} chars`);
 
       try {
-        await this.bot.editMessageText(confirmMessage, {
+        this.logger.debug(`About to call bot.editMessageText...`);
+
+        const editResult = await this.bot.editMessageText(confirmMessage, {
           chat_id: context.chatId,
           message_id: context.messageId,
           parse_mode: 'Markdown',
           reply_markup: keyboard
         });
+
         this.logger.info(`Successfully created broadcast confirmation message for admin ${adminId}`);
+        this.logger.debug(`Edit result:`, editResult);
       } catch (error) {
-        this.logger.error(`Failed to create broadcast confirmation message for admin ${adminId}`, error);
+        this.logger.error(`Failed to create broadcast confirmation message for admin ${adminId}`, {
+          error: error.message,
+          errorCode: error.code,
+          errorResponse: error.response?.body,
+          chatId: context.chatId,
+          messageId: context.messageId
+        });
         throw error;
       }
 
