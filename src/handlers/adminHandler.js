@@ -40,7 +40,7 @@ class AdminHandler {
 
   async handleCallback(query) {
     const userId = query.from.id;
-    const data = query.callback_data;
+    const data = query.callback_data || query.data;
 
     if (!this.isAdmin(userId)) {
       await this.bot.answerCallbackQuery(query.id, { text: 'Доступ запрещен' });
@@ -49,6 +49,8 @@ class AdminHandler {
 
     if (!data) {
       this.logger.warn(`Admin callback data is undefined for user: ${userId}`);
+      this.logger.warn(`Admin query.callback_data: ${query.callback_data}`);
+      this.logger.warn(`Admin query.data: ${query.data}`);
       await this.bot.answerCallbackQuery(query.id, { text: 'Ошибка: данные не получены' });
       return;
     }
