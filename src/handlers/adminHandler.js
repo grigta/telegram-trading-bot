@@ -504,6 +504,7 @@ ${messagePreview}
 
       // Get target users
       const users = await this.getBroadcastUsers(context.type);
+      this.logger.info(`Broadcast confirmation: type=${context.type}, users found=${users.length}`, { adminId });
 
       await this.bot.editMessageText(
         `🚀 **Рассылка запущена!**\n\n📊 Отправляется ${users.length} пользователям...\n\n⏳ Примерное время выполнения: ${Math.ceil(users.length / 20)} минут`,
@@ -515,6 +516,7 @@ ${messagePreview}
       );
 
       // Start broadcast in background
+      this.logger.info(`Starting executeBroadcast for ${users.length} users`, { adminId });
       this.executeBroadcast(users, broadcastMessage, query.message.chat.id, adminId);
 
       // Clean up settings
@@ -585,7 +587,9 @@ ${messagePreview}
       break;
     }
 
-    return await this.db.query(sql);
+    const users = await this.db.query(sql);
+    this.logger.info(`getBroadcastUsers: type=${type}, sql=${sql}, found=${users.length} users`);
+    return users;
   }
 
   async executeBroadcast(users, broadcastMessage, adminChatId, adminId) {
@@ -602,8 +606,10 @@ ${messagePreview}
           await new Promise(resolve => setTimeout(resolve, 1000));
         }
 
+        this.logger.debug(`Sending broadcast message to user ${user.telegram_id}`);
         await this.sendBroadcastMessage(user.telegram_id, broadcastMessage);
         sentCount++;
+        this.logger.debug(`Successfully sent to user ${user.telegram_id}, total sent: ${sentCount}`);
 
         // Update progress every 50 messages
         if (sentCount % 50 === 0) {
