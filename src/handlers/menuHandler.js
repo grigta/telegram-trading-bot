@@ -33,7 +33,10 @@ class MenuHandler {
             { text: lang === 'en' ? '🎁 VIP Bonus' : '🎁 VIP бонус', callback_data: 'vip_bonus' },
             { text: lang === 'en' ? '📄 FAQ' : '📄 Частые вопросы', callback_data: 'faq' }
           ],
-          [{ text: lang === 'en' ? '🔗 Pocket Option' : '🔗 Pocket Option', callback_data: 'pocket_option' }],
+          [
+            { text: lang === 'en' ? '⭐ Reviews' : '⭐ Отзывы', callback_data: 'reviews' },
+            { text: lang === 'en' ? '🔗 Pocket Option' : '🔗 Pocket Option', callback_data: 'pocket_option' }
+          ],
           [{ text: lang === 'en' ? '⚙️ Settings' : '⚙️ Настройки', callback_data: 'settings' }]
         ]
       };
@@ -176,6 +179,9 @@ _Выберите любой пункт меню для начала:_
       case 'pocket_option':
         await this.handlePocketOption(query, lang);
         break;
+      case 'reviews':
+        await this.handleReviews(query, lang);
+        break;
       case 'settings':
         await this.handleSettings(query, lang);
         break;
@@ -188,6 +194,8 @@ _Выберите любой пункт меню для начала:_
       default:
         if (data.startsWith('faq_')) {
           await this.handleFaqItem(query, lang, data);
+        } else if (data.startsWith('review_')) {
+          await this.handleReviewNavigation(query, lang, data);
         } else {
           this.logger.warn(`Unknown callback data: ${data}`);
           await this.bot.answerCallbackQuery(query.id, {
@@ -695,6 +703,167 @@ After registration and deposit, contact support to get your access.
     const userId = query.from.id;
     await this.showMainMenu(query.message.chat.id, userId);
     await this.bot.answerCallbackQuery(query.id);
+  }
+
+  async handleReviews(query, lang) {
+    try {
+      const chatId = query.message.chat.id;
+      const messageId = query.message.message_id;
+
+      // Show first review image
+      await this.showReviewImage(chatId, messageId, 0, lang);
+      await this.bot.answerCallbackQuery(query.id);
+
+    } catch (error) {
+      this.logger.error('Error handling reviews', error);
+      await this.bot.answerCallbackQuery(query.id, {
+        text: lang === 'en' ? 'Error loading reviews' : 'Ошибка загрузки отзывов'
+      });
+    }
+  }
+
+  async handleReviewNavigation(query, lang, data) {
+    try {
+      const chatId = query.message.chat.id;
+      const messageId = query.message.message_id;
+
+      if (data === 'review_back') {
+        // Return to main menu
+        await this.showMainMenu(chatId, query.from.id);
+        await this.bot.answerCallbackQuery(query.id);
+        return;
+      }
+
+      // Parse review navigation data (review_left_X or review_right_X)
+      const parts = data.split('_');
+      if (parts.length !== 3) {
+        throw new Error('Invalid review navigation data');
+      }
+
+      const direction = parts[1]; // 'left' or 'right'
+      const currentIndex = parseInt(parts[2]);
+
+      let newIndex;
+      if (direction === 'left') {
+        newIndex = currentIndex - 1;
+      } else if (direction === 'right') {
+        newIndex = currentIndex + 1;
+      } else {
+        throw new Error('Invalid navigation direction');
+      }
+
+      await this.showReviewImage(chatId, messageId, newIndex, lang);
+      await this.bot.answerCallbackQuery(query.id);
+
+    } catch (error) {
+      this.logger.error('Error handling review navigation', error);
+      await this.bot.answerCallbackQuery(query.id, {
+        text: lang === 'en' ? 'Navigation error' : 'Ошибка навигации'
+      });
+    }
+  }
+
+  async showReviewImage(chatId, messageId, index, lang) {
+    try {
+      const fs = require('fs');
+      const path = require('path');
+
+      // Get list of review images
+      const reviewsDir = path.join(process.cwd(), '@review_pics');
+
+      if (!fs.existsSync(reviewsDir)) {
+        throw new Error('Reviews directory not found');
+      }
+
+      const files = fs.readdirSync(reviewsDir)
+        .filter(file => /\.(jpg|jpeg|png|gif|webp)$/i.test(file))
+        .sort();
+
+      if (files.length === 0) {
+        const noImagesText = lang === 'en'
+          ? '📷 No review images found.\n\nPlease add images to @review_pics directory.'
+          : '📷 Изображения отзывов не найдены.\n\nДобавьте изображения в папку @review_pics.';
+
+        await this.bot.editMessageText(noImagesText, {
+          chat_id: chatId,
+          message_id: messageId,
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: lang === 'en' ? '← Back' : '← Назад', callback_data: 'main_menu' }]
+            ]
+          }
+        });
+        return;
+      }
+
+      // Handle index boundaries
+      if (index < 0) index = files.length - 1;
+      if (index >= files.length) index = 0;
+
+      const currentFile = files[index];
+      const imagePath = path.join(reviewsDir, currentFile);
+
+      // Create navigation buttons
+      const keyboard = {
+        inline_keyboard: [
+          [
+            { text: '⬅️', callback_data: `review_left_${index}` },
+            { text: lang === 'en' ? `${index + 1} / ${files.length}` : `${index + 1} / ${files.length}`, callback_data: 'noop' },
+            { text: '➡️', callback_data: `review_right_${index}` }
+          ],
+          [{ text: lang === 'en' ? '← Back' : '← Назад', callback_data: 'review_back' }]
+        ]
+      };
+
+      const caption = lang === 'en'
+        ? `⭐ *Reviews* - Image ${index + 1}`
+        : `⭐ *Отзывы* - Картинка ${index + 1}`;
+
+      // Try to edit with photo first
+      try {
+        await this.bot.editMessageMedia({
+          type: 'photo',
+          media: imagePath,
+          caption: caption,
+          parse_mode: 'Markdown'
+        }, {
+          chat_id: chatId,
+          message_id: messageId,
+          reply_markup: keyboard
+        });
+      } catch (editError) {
+        // If edit fails, delete old message and send new one
+        try {
+          await this.bot.deleteMessage(chatId, messageId);
+        } catch (deleteError) {
+          this.logger.warn('Could not delete old message', deleteError);
+        }
+
+        await this.bot.sendPhoto(chatId, imagePath, {
+          caption: caption,
+          parse_mode: 'Markdown',
+          reply_markup: keyboard
+        });
+      }
+
+    } catch (error) {
+      this.logger.error('Error showing review image', error);
+
+      // Fallback to text message
+      const errorText = lang === 'en'
+        ? '❌ Error loading review images.\n\nPlease make sure images are in @review_pics directory.'
+        : '❌ Ошибка загрузки изображений отзывов.\n\nУбедитесь, что изображения находятся в папке @review_pics.';
+
+      await this.bot.editMessageText(errorText, {
+        chat_id: chatId,
+        message_id: messageId,
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: lang === 'en' ? '← Back' : '← Назад', callback_data: 'main_menu' }]
+          ]
+        }
+      });
+    }
   }
 }
 
