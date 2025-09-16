@@ -808,7 +808,6 @@ After registration and deposit, contact support to get your access.
         inline_keyboard: [
           [
             { text: '⬅️', callback_data: `review_left_${index}` },
-            { text: lang === 'en' ? `${index + 1} / ${files.length}` : `${index + 1} / ${files.length}`, callback_data: 'noop' },
             { text: '➡️', callback_data: `review_right_${index}` }
           ],
           [{ text: lang === 'en' ? '← Back' : '← Назад', callback_data: 'review_back' }]
