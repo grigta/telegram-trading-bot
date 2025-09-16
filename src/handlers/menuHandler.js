@@ -815,9 +815,7 @@ After registration and deposit, contact support to get your access.
         ]
       };
 
-      const caption = lang === 'en'
-        ? `⭐ *Reviews* - Image ${index + 1}`
-        : `⭐ *Отзывы* - Картинка ${index + 1}`;
+      const caption = '';
 
       // Try to edit with photo first
       try {

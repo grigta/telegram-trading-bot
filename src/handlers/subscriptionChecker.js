@@ -338,33 +338,19 @@ If you're having trouble subscribing:
     const message = lang === 'en' ? `
 📱 *Share your phone number*
 
-🎯 This is necessary for:
-• 🔔 Personal trading signal notifications
-• 🎁 Exclusive bonuses and promotions
-• 🆘 Quick support communication
-• 💰 Notifications about new earning opportunities
+This is necessary for:
 
-🔐 *Privacy guaranteed:*
-• Your number is used only for notifications
-• We don't share data with third parties
-• You can unsubscribe anytime
-
-👇 Press the button below to continue
+• Personal notifications about signals
+• Quick communication with support
+• Notifications about new strategies
     ` : `
 📱 *Поделитесь номером телефона*
 
-🎯 Это необходимо для:
-• 🔔 Персональных уведомлений о торговых сигналах
-• 🎁 Получения эксклюзивных бонусов и акций
-• 🆘 Быстрой связи с поддержкой
-• 💰 Уведомлений о новых возможностях заработка
+Это необходимо для:
 
-🔐 *Конфиденциальность гарантирована:*
-• Ваш номер используется только для уведомлений
-• Мы не передаем данные третьим лицам
-• Вы можете отписаться в любой момент
-
-👇 Нажмите кнопку ниже, чтобы продолжить
+• Персональных уведомлений о сигналах
+• Быстрой связи с поддержкой
+• Уведомлений о новых стратегиях
     `;
 
     await this.bot.sendMessage(msg.chat.id, message, {
