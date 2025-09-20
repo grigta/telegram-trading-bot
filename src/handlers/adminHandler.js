@@ -409,13 +409,13 @@ class AdminHandler {
       sql += ' AND is_subscribed = 1';
       break;
     case 'registered':
-      sql += ' AND partner_status = "registered"';
+      sql += ' AND is_registered = 1';
       break;
     case 'deposit':
-      sql += ' AND first_deposit_amount > 0';
+      sql += ' AND has_deposit = 1';
       break;
     case 'vip':
-      sql += ' AND vip_status = 1';
+      sql += ' AND vip_access = 1';
       break;
     case 'all':
     default:
@@ -631,7 +631,10 @@ ${messagePreview}
 
       // Start broadcast in background
       this.logger.info(`Starting executeBroadcast for ${users.length} users`, { adminId });
-      this.executeBroadcast(users, broadcastMessage, query.message.chat.id, adminId);
+      // Execute broadcast without await to avoid blocking the callback response
+      this.executeBroadcast(users, broadcastMessage, query.message.chat.id, adminId).catch(error => {
+        this.logger.error('Error in background broadcast execution', error);
+      });
 
       // Clean up settings
       await this.db.setSetting(`broadcast_context_${adminId}`, null);
@@ -692,13 +695,13 @@ ${messagePreview}
       sql += ' AND is_subscribed = 1';
       break;
     case 'registered':
-      sql += ' AND partner_status = "registered"';
+      sql += ' AND is_registered = 1';
       break;
     case 'deposit':
-      sql += ' AND first_deposit_amount > 0';
+      sql += ' AND has_deposit = 1';
       break;
     case 'vip':
-      sql += ' AND vip_status = 1';
+      sql += ' AND vip_access = 1';
       break;
     case 'all':
     default:
